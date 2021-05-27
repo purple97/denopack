@@ -21,8 +21,8 @@ class BuildFile {
   async createModule(entryPath: string, entry: string) {
     const fileText = await Deno.readTextFile(entryPath);
     const fileSource: string = fileText.toString();
-    const { code, deps } = this.resourceParse(fileSource, path.dirname(entry));
-    //读取的内容加入到modules对象中
+    this.resourceParse(fileSource, path.dirname(entry));
+    //读取的内容加入到modules对象中const { code, deps } =
     BuildFile.modules[entry] = code;
 
     for (let i in deps) {
