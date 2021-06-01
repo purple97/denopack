@@ -11,7 +11,7 @@ export class Denopack extends Command {
       .arguments("[build]")
       .stopEarly()
       .action(() => {
-        console.log("action");
+        console.log("denopck <command> <?arguments>");
       })
       .command("build", new Build())
       .reset();

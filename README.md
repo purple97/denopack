@@ -13,18 +13,19 @@
 
 ## 使用
 
+- 先安装 Deno 环境
 - 挂载到全局命令
 
 ```sh
-$ deno install -qA -n denopack ./index.ts
+deno install -qA -n denopack ./index.ts
 ```
 
 - 使用
 
 ```sh
-$ cd my-prodction
+cd my-prodction
 # 默认 ./index.js入口, 输出 "./dist/main.js"
-$ denopack build
+denopack build
 ```
 
 ## 开发
