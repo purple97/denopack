@@ -99,10 +99,13 @@ async function build(opstion = {}) {
     },
     opstion
   );
+  const start_time = new Date().getTime();
+  console.time("[DenoPack]Build Time");
   //初始开始
   let compler = new BuildFile(defaultConfig);
   // 开始构建
-  compler.start();
+  await compler.start();
+  console.timeEnd("[DenoPack]Build Time");
 }
 
 export default build;
