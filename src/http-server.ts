@@ -2,7 +2,7 @@ import { serve } from "https://deno.land/std/http/server.ts";
 import FormatJsonToString from "./utils/format-json-to-string.ts";
 
 interface IEnv {
-  [string]?: stirng | number | null;
+  [string]?: string | number | null;
 }
 
 const env: IEnv = Deno.env.toObject();

@@ -1,5 +1,5 @@
 interface IEnv {
-  [string]?: stirng | number | null;
+  [string]?: string | number | null;
 }
 
 export function FormatValue(value: string) {

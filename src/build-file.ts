@@ -19,6 +19,7 @@ class BuildFile {
     );
   }
   async createModule(entryPath: string, entry: string) {
+    console.log(entryPath);
     const fileText = await Deno.readTextFile(entryPath);
     const fileSource: string = fileText.toString();
     const { code, deps } = this.resourceParse(fileSource, path.dirname(entry));
@@ -87,7 +88,7 @@ class BuildFile {
   }
 }
 
-async function build(opstion = {}) {
+async function build(options = {}) {
   const env = Deno.env.toObject();
   const defaultConfig = Object.assign(
     {
@@ -97,11 +98,11 @@ async function build(opstion = {}) {
         fileName: "main.js",
       },
     },
-    opstion
+    options
   );
-  const start_time = new Date().getTime();
+  // console.log(defaultConfig);
   console.time("[DenoPack]Build Time");
-  //初始开始
+  //初始化开始
   let compler = new BuildFile(defaultConfig);
   // 开始构建
   await compler.start();
