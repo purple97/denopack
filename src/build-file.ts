@@ -8,6 +8,10 @@ class BuildFile {
   static outputPath: string = "";
   static modules: any = {};
   static loaders = [];
+
+  //
+  public plugins: any[] = [];
+  public hooks: { [str: string]: any } = {};
   constructor(config: any) {
     BuildFile.root = Deno.cwd();
     BuildFile.entry = config.entry;
@@ -17,11 +21,13 @@ class BuildFile {
       config.output.path,
       config.output.fileName
     );
+    BuildFile.loaders = config.modules.rules;
   }
+
   async createModule(entryPath: string, entry: string) {
     console.log(entryPath);
     const fileText = await Deno.readTextFile(entryPath);
-    const fileSource: string = fileText.toString();
+    let fileSource: string = fileText.toString();
     const { code, deps } = this.resourceParse(fileSource, path.dirname(entry));
     //读取的内容加入到modules对象中
     BuildFile.modules[entry] = code;
@@ -72,19 +78,50 @@ class BuildFile {
   async start() {
     //读取各模块以及依赖
     await this.createModule(BuildFile.entryPath, BuildFile.entry);
-    // this.runLoader(BuildFile.modules)
+    this.runRules();
+    // this.runPlugin("compilation");
     //进一步对代码加工
     Object.keys(BuildFile.modules).forEach((name) => {
       BuildFile.modules[name] = this.wrapCode(BuildFile.modules[name]);
     });
     //准备写入文件
     await this.generateFile(BuildFile.modules);
+    // this.runPlugin("emit");
     return this;
   }
 
-  async runLoader(modules: any[]) {
+  async runRules() {
     const loaders = BuildFile.loaders;
-    const modulesKeys = Object.keys(modules);
+    const modules = BuildFile.modules;
+    Object.keys(modules).forEach((name) => {
+      this.runLoader(name, modules[name], loaders);
+    });
+  }
+
+  /*  */
+  async runLoader(name: string, fileSource: string, loaders: any[]) {
+    let _fileSource = fileSource;
+    loaders.forEach((loaderItem) => {
+      if (loaderItem.test.test(name)) {
+        console.log(`run loader : ${loaderItem.use}!!!${name}`);
+      }
+    });
+    return {
+      name,
+      source: _fileSource,
+    };
+  }
+
+  /* 运行插件 */
+  async runPlugin(name: string) {
+    console.log("event status:", name);
+    if (this.hooks[name]) {
+      this.hooks[name].forEach((hook: string) => {
+        if (this.hooks[name].run) {
+          this.hooks[name].run(BuildFile);
+        }
+      });
+    }
   }
 }
 
@@ -97,15 +134,28 @@ async function build(options = {}) {
         path: "./dist/",
         fileName: "main.js",
       },
+      modules: {
+        rules: [{ test: /\.js$/, use: "my-loader" }],
+      },
     },
     options
   );
   // console.log(defaultConfig);
   console.time("[DenoPack]Build Time");
   //初始化开始
-  let compler = new BuildFile(defaultConfig);
+  let complier = new BuildFile(defaultConfig);
+
+  //注册插件
+  complier.plugins.forEach((plugin) => {
+    if (plugin.apply && typeof plugin.apply === "function") {
+      plugin.apply(complier);
+    }
+  });
+
+  // complier.runPlugin("beforeRun");
+
   // 开始构建
-  await compler.start();
+  await complier.start();
   console.timeEnd("[DenoPack]Build Time");
 }
 
