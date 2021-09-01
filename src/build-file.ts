@@ -1,6 +1,19 @@
 import { path } from "../deps.ts";
 import tpl from "./template/tpl.js";
 
+class AsyncSeriesHook {
+  static names: string[] | null[];
+  constructor(names: string[] | null[]) {
+    AsyncSeriesHook.names = names;
+  }
+  tap(name: string, callback: () => void) {
+    console.log("tap", name, callback);
+  }
+  call() {
+    console.log("call", AsyncSeriesHook.names);
+  }
+}
+
 class BuildFile {
   static root: string = "";
   static entry: string = "";
@@ -12,6 +25,7 @@ class BuildFile {
   //
   public plugins: any[] = [];
   public hooks: { [str: string]: any } = {};
+
   constructor(config: any) {
     BuildFile.root = Deno.cwd();
     BuildFile.entry = config.entry;
@@ -22,6 +36,9 @@ class BuildFile {
       config.output.fileName
     );
     BuildFile.loaders = config.modules.rules;
+    this.hooks = {
+      beforeRun: new AsyncSeriesHook(["MyPlugin"]),
+    };
   }
 
   async createModule(entryPath: string, entry: string) {
@@ -116,11 +133,7 @@ class BuildFile {
   async runPlugin(name: string) {
     console.log("event status:", name);
     if (this.hooks[name]) {
-      this.hooks[name].forEach((hook: string) => {
-        if (this.hooks[name].run) {
-          this.hooks[name].run(BuildFile);
-        }
-      });
+      this.hooks[name].call(BuildFile);
     }
   }
 }
