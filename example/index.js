@@ -1,2 +1,2 @@
-const Index = __denopack__require__("./a.js");
+const Index = require("./a.js");
 Index("Hello world!");
