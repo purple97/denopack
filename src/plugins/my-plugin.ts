@@ -14,7 +14,7 @@ class MyPlugin {
       },
     );
 
-    /* 构建初始化后
+    /* 加载文件并处理后，包括loader运行结束。这个时候可以对每个文件处理或者统计等
     */
     compiler.hooks.tap(
       "compilation",
