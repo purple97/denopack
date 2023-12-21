@@ -1,5 +1,7 @@
+// import { stat } from "deno";
 import { path } from "../deps.ts";
 import tpl from "./template/tpl.js";
+
 
 class AsyncSeriesHook {
   static names: string[] | null[];
@@ -20,6 +22,7 @@ class BuildFile {
   static entryPath: string = "";
   static outputPath: string = "";
   static modules: any = {};
+  static loaderPathBase: string = "";
   static loaders = [];
 
   //
@@ -35,7 +38,11 @@ class BuildFile {
       config.output.path,
       config.output.fileName
     );
-    BuildFile.loaders = config.modules.rules;
+    BuildFile.loaderPathBase = path.join(Deno.mainModule.replace('file:\/\/', ''), '../src/loaders')
+    BuildFile.loaders = config.modules.rules.map((rule:{test: RegExp, use: any})=>{
+      rule.use = this.requireLoader(rule.use);
+      return rule
+    });
     this.hooks = {
       beforeRun: new AsyncSeriesHook(["MyPlugin"]),
     };
@@ -95,7 +102,7 @@ class BuildFile {
   async start() {
     //读取各模块以及依赖
     await this.createModule(BuildFile.entryPath, BuildFile.entry);
-    this.runRules();
+    await this.runRules();
     // this.runPlugin("compilation");
     //进一步对代码加工
     Object.keys(BuildFile.modules).forEach((name) => {
@@ -110,23 +117,37 @@ class BuildFile {
   async runRules() {
     const loaders = BuildFile.loaders;
     const modules = BuildFile.modules;
-    Object.keys(modules).forEach((name) => {
-      this.runLoader(name, modules[name], loaders);
-    });
+    for await (const name of Object.keys(modules)) {
+      const res = await this.runLoader(name, modules[name], loaders);
+      modules[name] = res.code
+    }
+  }
+
+  async requireLoader(name:string) {
+    const filePath = path.resolve(BuildFile.loaderPathBase, `${name}.ts`)
+    if (Deno.stat(filePath)) {
+      return await import(filePath);
+    }
+    return null
   }
 
   /*  */
   async runLoader(name: string, fileSource: string, loaders: any[]) {
     let _fileSource = fileSource;
-    loaders.forEach((loaderItem) => {
+    for await (const loaderItem of loaders) {
       if (loaderItem.test.test(name)) {
-        console.log(`run loader : ${loaderItem.use}!!!${name}`);
+        if(loaderItem.use){
+          const res = await loaderItem.use;
+          const loader = res.default;
+            console.log(`run loader`, loader);
+            _fileSource = loader(_fileSource)
+        }
       }
-    });
+    }
     return {
       name,
-      source: _fileSource,
-    };
+      code:_fileSource
+    }
   }
 
   /* 运行插件 */
