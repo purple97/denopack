@@ -1,20 +1,8 @@
 // import { stat } from "deno";
 import { path } from "../deps.ts";
 import tpl from "./template/tpl.js";
-
-
-class AsyncSeriesHook {
-  static names: string[] | null[];
-  constructor(names: string[] | null[]) {
-    AsyncSeriesHook.names = names;
-  }
-  tap(name: string, callback: () => void) {
-    console.log("tap", name, callback);
-  }
-  call() {
-    console.log("call", AsyncSeriesHook.names);
-  }
-}
+import AsyncSeriesHook from "./utils/AsyncSeriesHook.ts";
+import MyPlugin from "./plugins/my-plugin.ts";
 
 class BuildFile {
   static root: string = "";
@@ -30,22 +18,28 @@ class BuildFile {
   public hooks: { [str: string]: any } = {};
 
   constructor(config: any) {
+    /* 初始化 */
     BuildFile.root = Deno.cwd();
     BuildFile.entry = config.entry;
     BuildFile.entryPath = path.resolve(BuildFile.root, config.entry);
     BuildFile.outputPath = path.resolve(
       BuildFile.root,
       config.output.path,
-      config.output.fileName
+      config.output.fileName,
     );
-    BuildFile.loaderPathBase = path.join(Deno.mainModule.replace('file:\/\/', ''), '../src/loaders')
-    BuildFile.loaders = config.modules.rules.map((rule:{test: RegExp, use: any})=>{
-      rule.use = this.requireLoader(rule.use);
-      return rule
-    });
-    this.hooks = {
-      beforeRun: new AsyncSeriesHook(["MyPlugin"]),
-    };
+    BuildFile.loaderPathBase = path.join(
+      Deno.mainModule.replace("file:\/\/", ""),
+      "../src/loaders",
+    );
+    BuildFile.loaders = config.modules.rules.map(
+      (rule: { test: RegExp; use: any }) => {
+        rule.use = this.requireLoader(rule.use);
+        return rule;
+      },
+    );
+
+    this.plugins = config.plugins;
+    this.hooks = new AsyncSeriesHook(["beforeRun", "compilation", "emit"]);
   }
 
   async createModule(entryPath: string, entry: string) {
@@ -60,7 +54,7 @@ class BuildFile {
       const item = deps[i];
       await this.createModule(
         path.resolve(path.dirname(entryPath), item),
-        item
+        item,
       );
     }
   }
@@ -73,7 +67,7 @@ class BuildFile {
       function (match: string, filename: string) {
         deps.push(filename);
         return `__denopack_require__("${filename}")`;
-      }
+      },
     );
     return { code: newResource, deps };
   }
@@ -103,14 +97,14 @@ class BuildFile {
     //读取各模块以及依赖
     await this.createModule(BuildFile.entryPath, BuildFile.entry);
     await this.runRules();
-    // this.runPlugin("compilation");
+    this.runPlugin("compilation");
     //进一步对代码加工
     Object.keys(BuildFile.modules).forEach((name) => {
       BuildFile.modules[name] = this.wrapCode(BuildFile.modules[name]);
     });
     //准备写入文件
     await this.generateFile(BuildFile.modules);
-    // this.runPlugin("emit");
+    this.runPlugin("emit");
     return this;
   }
 
@@ -119,16 +113,16 @@ class BuildFile {
     const modules = BuildFile.modules;
     for await (const name of Object.keys(modules)) {
       const res = await this.runLoader(name, modules[name], loaders);
-      modules[name] = res.code
+      modules[name] = res.code;
     }
   }
 
-  async requireLoader(name:string) {
-    const filePath = path.resolve(BuildFile.loaderPathBase, `${name}.ts`)
+  async requireLoader(name: string) {
+    const filePath = path.resolve(BuildFile.loaderPathBase, `${name}.ts`);
     if (Deno.stat(filePath)) {
       return await import(filePath);
     }
-    return null
+    return null;
   }
 
   /*  */
@@ -136,33 +130,37 @@ class BuildFile {
     let _fileSource = fileSource;
     for await (const loaderItem of loaders) {
       if (loaderItem.test.test(name)) {
-        if(loaderItem.use){
+        if (loaderItem.use) {
           const res = await loaderItem.use;
           const loader = res.default;
-            console.log(`run loader`, loader);
-            _fileSource = loader(_fileSource)
+          _fileSource = loader(_fileSource);
         }
       }
     }
     return {
       name,
-      code:_fileSource
-    }
+      code: _fileSource,
+    };
   }
 
-  /* 运行插件 */
+  /* 运行插件
+  * name<string>:事件名
+  */
   async runPlugin(name: string) {
-    console.log("event status:", name);
-    if (this.hooks[name]) {
-      this.hooks[name].call(BuildFile);
-    }
+    // console.log("event status:", name);
+    this.hooks.call(name, BuildFile);
   }
 }
 
+/* ------------------------------------------------------------------------------ */
+/*
+ * run build
+ */
 async function build(options = {}) {
   const env = Deno.env.toObject();
   const defaultConfig = Object.assign(
     {
+      env: env.DENOPACK_ENV || "local",
       entry: "./index.js",
       output: {
         path: "./dist/",
@@ -171,8 +169,13 @@ async function build(options = {}) {
       modules: {
         rules: [{ test: /\.js$/, use: "my-loader" }],
       },
+      plugins: [
+        new MyPlugin({
+          name: "kk",
+        }),
+      ],
     },
-    options
+    options,
   );
   // console.log(defaultConfig);
   console.time("[DenoPack]Build Time");
@@ -186,7 +189,7 @@ async function build(options = {}) {
     }
   });
 
-  // complier.runPlugin("beforeRun");
+  complier.runPlugin("beforeRun");
 
   // 开始构建
   await complier.start();
