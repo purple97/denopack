@@ -25,3 +25,21 @@ class AsyncSeriesHook {
 }
 
 export default AsyncSeriesHook;
+
+/*
+生成：
+{
+  "beforeRun": [
+    [Function: callback]
+  ],
+  "compilation": [
+    [Function: callback]
+  ],
+  "emit": [
+    [Function: callback]
+  ]
+}
+通过tap方法，将callback方法挂载到对应的事件上，
+然后通过call方法，执行对应事件的callback方法。
+call方便被runPlugin方法调用，runPlugin方法是在build-file.ts中调用的。
+*/
